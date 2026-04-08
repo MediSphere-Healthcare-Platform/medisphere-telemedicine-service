@@ -7,7 +7,7 @@ import java.util.Date;
 
 public class TokenGenerator {
     public static void main(String[] args) {
-        String secret = "your_very_secure_and_long_secret_key_for_medisphere_telemedicine_service_2026";
+        String secret = "your-shared-secret-key-must-be-at-least-32-chars-long";
         var key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
 
         String doctorToken = Jwts.builder()

@@ -10,8 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 @RestController
 @RequestMapping("/api/sessions")
@@ -34,40 +32,20 @@ public class SessionController {
     }
 
     // GET /api/sessions/{sessionId}
-// Update getSession endpoint
     @GetMapping("/{sessionId}")
     @PreAuthorize("hasAnyRole('PATIENT', 'DOCTOR', 'ADMIN')")
     public ResponseEntity<SessionResponse> getSession(
             @PathVariable String sessionId) {
-
-        // get the role of whoever is calling
-        Authentication auth = SecurityContextHolder
-                .getContext().getAuthentication();
-        String role = auth.getAuthorities().iterator().next()
-                .getAuthority().replace("ROLE_", "");
-        String userId = auth.getPrincipal().toString();
-
-        return ResponseEntity.ok(
-                sessionService.getSession(sessionId, userId, role));
+        return ResponseEntity.ok(sessionService.getSession(sessionId));
     }
 
     // GET /api/sessions/appointment/{appointmentId}
     // Used by frontend to get the room URL for a given appointment
-    // Update getByAppointment endpoint
     @GetMapping("/appointment/{appointmentId}")
     @PreAuthorize("hasAnyRole('PATIENT', 'DOCTOR', 'ADMIN')")
     public ResponseEntity<SessionResponse> getByAppointment(
             @PathVariable Integer appointmentId) {
-
-        Authentication auth = SecurityContextHolder
-                .getContext().getAuthentication();
-        String role = auth.getAuthorities().iterator().next()
-                .getAuthority().replace("ROLE_", "");
-        String userId = auth.getPrincipal().toString();
-
-        return ResponseEntity.ok(
-                sessionService.getSessionByAppointmentId(
-                        appointmentId, userId, role));
+        return ResponseEntity.ok(sessionService.getSessionByAppointmentId(appointmentId));
     }
 
     // GET /api/sessions/patient/{patientId}
