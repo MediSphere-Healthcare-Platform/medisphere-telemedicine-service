@@ -21,4 +21,5 @@ public class SessionResponse {
     private String notes;
     private LocalDateTime createDate;
     private LocalDateTime modifiedDate;
+    private String jitsiToken;
 }

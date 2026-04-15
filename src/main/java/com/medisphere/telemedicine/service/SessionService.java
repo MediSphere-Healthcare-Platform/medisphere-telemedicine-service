@@ -7,14 +7,15 @@ import com.medisphere.telemedicine.dto.SessionResponse;
 import com.medisphere.telemedicine.entity.Session;
 import com.medisphere.telemedicine.exception.SessionNotFoundException;
 import com.medisphere.telemedicine.repository.SessionRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
-import org.slf4j.Logger;        // Correct Logger
-import org.slf4j.LoggerFactory; // Correct Factory
 import java.util.stream.Collectors;
 
 @Service
@@ -26,6 +27,7 @@ public class SessionService {
     private final SessionRepository sessionRepository;
     private final NotificationClient notificationClient;
     private final AppointmentClient appointmentClient;
+    private final JitsiTokenService jitsiTokenService;
 
     @Value("${jitsi.base-url}")
     private String jitsiBaseUrl;
@@ -35,16 +37,19 @@ public class SessionService {
 
     public SessionService(SessionRepository sessionRepository,
                           NotificationClient notificationClient,
-                          AppointmentClient appointmentClient) {
-        this.sessionRepository = sessionRepository;
+                          AppointmentClient appointmentClient,
+                          JitsiTokenService jitsiTokenService) {
+        this.sessionRepository  = sessionRepository;
         this.notificationClient = notificationClient;
-        this.appointmentClient = appointmentClient;
+        this.appointmentClient  = appointmentClient;
+        this.jitsiTokenService  = jitsiTokenService;
     }
 
     // Called by Appointment Service when appointment is confirmed
+    @Transactional
     public SessionResponse createSession(SessionCreateRequest request) {
 
-        // Validate appointment exists in Appointment Service
+        // Graceful degradation — warn if Appointment Service is unreachable
         if (!appointmentClient.appointmentExists(request.getAppointmentId())) {
             log.warn("Could not verify appointment {} — " +
                             "Appointment Service may be unavailable",
@@ -67,23 +72,33 @@ public class SessionService {
         session.setStatus(SessionStatus.SCHEDULED);
 
         Session saved = sessionRepository.save(session);
+
+        // No role context at creation time — return without jitsiToken
         return mapToResponse(saved);
     }
 
-    public SessionResponse getSession(String sessionId) {
+    // Role-aware — generates correct jitsiToken for caller
+    @Transactional(readOnly = true)
+    public SessionResponse getSession(String sessionId,
+                                      String userId, String role) {
         Session session = sessionRepository.findBySessionId(sessionId)
                 .orElseThrow(() -> new SessionNotFoundException(
                         "Session not found: " + sessionId));
-        return mapToResponse(session);
+        return mapToResponse(session, userId, role);
     }
 
-    public SessionResponse getSessionByAppointmentId(Integer appointmentId) {
+    // Role-aware — generates correct jitsiToken for caller
+    @Transactional(readOnly = true)
+    public SessionResponse getSessionByAppointmentId(Integer appointmentId,
+                                                     String userId,
+                                                     String role) {
         Session session = sessionRepository.findByAppointmentId(appointmentId)
                 .orElseThrow(() -> new SessionNotFoundException(
                         "No session found for appointment: " + appointmentId));
-        return mapToResponse(session);
+        return mapToResponse(session, userId, role);
     }
 
+    @Transactional(readOnly = true)
     public List<SessionResponse> getPatientSessions(Integer patientId) {
         return sessionRepository.findByPatientId(patientId)
                 .stream()
@@ -91,6 +106,7 @@ public class SessionService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<SessionResponse> getDoctorSessions(Integer doctorId) {
         return sessionRepository.findByDoctorId(doctorId)
                 .stream()
@@ -99,6 +115,7 @@ public class SessionService {
     }
 
     // Mark session as ACTIVE when either party joins the room
+    @Transactional
     public SessionResponse startSession(String sessionId) {
         Session session = sessionRepository.findBySessionId(sessionId)
                 .orElseThrow(() -> new SessionNotFoundException(
@@ -118,7 +135,9 @@ public class SessionService {
     }
 
     // Doctor ends session, calculates duration, fires notification
-    public SessionResponse endSession(String sessionId, EndSessionRequest request) {
+    @Transactional
+    public SessionResponse endSession(String sessionId,
+                                      EndSessionRequest request) {
         Session session = sessionRepository.findBySessionId(sessionId)
                 .orElseThrow(() -> new SessionNotFoundException(
                         "Session not found: " + sessionId));
@@ -142,12 +161,13 @@ public class SessionService {
 
         Session saved = sessionRepository.save(session);
 
-        // Fire notification (non-blocking — failure won't break response)
+        // Non-blocking — failure won't break the response
         notificationClient.notifySessionCompleted(saved);
 
         return mapToResponse(saved);
     }
 
+    @Transactional
     public SessionResponse cancelSession(String sessionId) {
         Session session = sessionRepository.findBySessionId(sessionId)
                 .orElseThrow(() -> new SessionNotFoundException(
@@ -161,8 +181,38 @@ public class SessionService {
         return mapToResponse(sessionRepository.save(session));
     }
 
-    // --- Entity → DTO mapper ---
+    // ---------------------------------------------------------------
+    // Mappers
+    // ---------------------------------------------------------------
+
+    // Role-aware mapper — generates jitsiToken specific to caller
+    private SessionResponse mapToResponse(Session session,
+                                          String userId, String role) {
+        SessionResponse res = buildBaseResponse(session);
+
+        boolean isModerator = "DOCTOR".equals(role);
+        String userName = isModerator
+                ? "Dr. " + userId
+                : "Patient " + userId;
+
+        res.setJitsiToken(jitsiTokenService.generateToken(
+                session.getRoomName(),
+                userId,
+                userName,
+                isModerator
+        ));
+
+        return res;
+    }
+
+    // Plain mapper — no jitsiToken (used for list endpoints,
+    // create, start, end, cancel where token isn't needed)
     private SessionResponse mapToResponse(Session session) {
+        return buildBaseResponse(session);
+    }
+
+    // Shared base — builds everything except jitsiToken
+    private SessionResponse buildBaseResponse(Session session) {
         SessionResponse res = new SessionResponse();
         res.setSessionId(session.getSessionId());
         res.setAppointmentId(session.getAppointmentId());
