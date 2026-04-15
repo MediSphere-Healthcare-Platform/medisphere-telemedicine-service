@@ -18,6 +18,12 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument(
+            IllegalArgumentException ex) {
+        log.error("IllegalArgumentException: {}", ex.getMessage());
+        return buildError(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
     @ExceptionHandler(SessionNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleSessionNotFound(SessionNotFoundException ex) {
         log.error("SessionNotFoundException: {}", ex.getMessage());

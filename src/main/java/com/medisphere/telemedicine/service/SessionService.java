@@ -13,13 +13,19 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;        // Correct Logger
+import org.slf4j.LoggerFactory; // Correct Factory
 import java.util.stream.Collectors;
 
 @Service
 public class SessionService {
 
+    private static final Logger log =
+            LoggerFactory.getLogger(SessionService.class);
+
     private final SessionRepository sessionRepository;
     private final NotificationClient notificationClient;
+    private final AppointmentClient appointmentClient;
 
     @Value("${jitsi.base-url}")
     private String jitsiBaseUrl;
@@ -28,18 +34,27 @@ public class SessionService {
     private String jitsiRoomPrefix;
 
     public SessionService(SessionRepository sessionRepository,
-                          NotificationClient notificationClient) {
+                          NotificationClient notificationClient,
+                          AppointmentClient appointmentClient) {
         this.sessionRepository = sessionRepository;
         this.notificationClient = notificationClient;
+        this.appointmentClient = appointmentClient;
     }
 
     // Called by Appointment Service when appointment is confirmed
     public SessionResponse createSession(SessionCreateRequest request) {
 
-        // Generate a unique, URL-safe Jitsi room name
-        String uniquePart = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
-        String roomName   = jitsiRoomPrefix + uniquePart;
-        String roomUrl    = jitsiBaseUrl + "/" + roomName;
+        // Validate appointment exists in Appointment Service
+        if (!appointmentClient.appointmentExists(request.getAppointmentId())) {
+            log.warn("Could not verify appointment {} — " +
+                            "Appointment Service may be unavailable",
+                    request.getAppointmentId());
+        }
+
+        String uniquePart = UUID.randomUUID()
+                .toString().replace("-", "").substring(0, 12);
+        String roomName = jitsiRoomPrefix + uniquePart;
+        String roomUrl  = jitsiBaseUrl + "/" + roomName;
 
         Session session = new Session();
         session.setSessionId(UUID.randomUUID().toString());
