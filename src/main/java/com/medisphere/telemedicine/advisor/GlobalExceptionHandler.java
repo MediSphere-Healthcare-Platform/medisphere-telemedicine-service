@@ -1,5 +1,6 @@
 package com.medisphere.telemedicine.advisor;
 
+import com.medisphere.telemedicine.exception.PrescriptionNotFoundException;
 import com.medisphere.telemedicine.exception.SessionNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +22,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(SessionNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleSessionNotFound(SessionNotFoundException ex) {
         log.error("SessionNotFoundException: {}", ex.getMessage());
+        return buildError(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(PrescriptionNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handlePrescriptionNotFound(PrescriptionNotFoundException ex) {
+        log.warn("PrescriptionNotFoundException: {}", ex.getMessage());
         return buildError(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
