@@ -2,6 +2,7 @@ package com.medisphere.telemedicine.controller;
 
 import com.medisphere.telemedicine.dto.EndSessionRequest;
 import com.medisphere.telemedicine.dto.SessionCreateRequest;
+import com.medisphere.telemedicine.dto.SessionRequestRequest;
 import com.medisphere.telemedicine.dto.SessionResponse;
 import com.medisphere.telemedicine.service.SessionService;
 import jakarta.validation.Valid;
@@ -106,10 +107,60 @@ public class SessionController {
     }
 
     // PUT /api/sessions/{sessionId}/cancel
+    // Patients can cancel their own PENDING_APPROVAL requests; doctors/admins can cancel any
     @PutMapping("/{sessionId}/cancel")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('PATIENT', 'DOCTOR', 'ADMIN')")
     public ResponseEntity<SessionResponse> cancelSession(
             @PathVariable String sessionId) {
         return ResponseEntity.ok(sessionService.cancelSession(sessionId));
+    }
+
+    // POST /api/sessions/request
+    // Patient requests a session with a specific doctor
+    @PostMapping("/request")
+    @PreAuthorize("hasRole('PATIENT')")
+    public ResponseEntity<SessionResponse> requestSession(
+            @Valid @RequestBody SessionRequestRequest request) {
+
+        String patientUserId = SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal().toString();
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(sessionService.requestSession(request, patientUserId));
+    }
+
+    // PUT /api/sessions/{sessionId}/accept
+    // Doctor accepts a PENDING_APPROVAL session → SCHEDULED
+    @PutMapping("/{sessionId}/accept")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<SessionResponse> acceptSession(
+            @PathVariable String sessionId) {
+
+        String doctorUserId = SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal().toString();
+
+        return ResponseEntity.ok(sessionService.acceptSession(sessionId, doctorUserId));
+    }
+
+    // PUT /api/sessions/{sessionId}/reject
+    // Doctor rejects a PENDING_APPROVAL session → CANCELLED
+    @PutMapping("/{sessionId}/reject")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<SessionResponse> rejectSession(
+            @PathVariable String sessionId) {
+
+        String doctorUserId = SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal().toString();
+
+        return ResponseEntity.ok(sessionService.rejectSession(sessionId, doctorUserId));
+    }
+
+    // GET /api/sessions/doctor/{doctorId}/pending
+    // Doctor sees all sessions awaiting their approval
+    @GetMapping("/doctor/{doctorId}/pending")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+    public ResponseEntity<List<SessionResponse>> getPendingForDoctor(
+            @PathVariable Integer doctorId) {
+        return ResponseEntity.ok(sessionService.getPendingForDoctor(doctorId));
     }
 }

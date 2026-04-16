@@ -24,8 +24,8 @@ public class Session {
     @Column(name = "session_id", unique = true, nullable = false, length = 50)
     private String sessionId;
 
-    // FK → medisphere_appointment.id
-    @Column(name = "appointment_id", nullable = false)
+    // FK → medisphere_appointment.id (null for patient-requested sessions)
+    @Column(name = "appointment_id")
     private Integer appointmentId;
 
     // FK → medisphere_patient.id
@@ -60,6 +60,10 @@ public class Session {
 
     @Column(name = "notes", columnDefinition = "text")
     private String notes;
+
+    // Filled by patient when requesting a session
+    @Column(name = "request_reason", columnDefinition = "text")
+    private String requestReason;
 
     @Column(name = "create_date")
     private LocalDateTime createDate;

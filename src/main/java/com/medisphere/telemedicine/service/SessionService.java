@@ -3,6 +3,7 @@ package com.medisphere.telemedicine.service;
 import com.medisphere.telemedicine.domain.SessionStatus;
 import com.medisphere.telemedicine.dto.EndSessionRequest;
 import com.medisphere.telemedicine.dto.SessionCreateRequest;
+import com.medisphere.telemedicine.dto.SessionRequestRequest;
 import com.medisphere.telemedicine.dto.SessionResponse;
 import com.medisphere.telemedicine.entity.Session;
 import com.medisphere.telemedicine.exception.SessionNotFoundException;
@@ -114,6 +115,86 @@ public class SessionService {
                 .collect(Collectors.toList());
     }
 
+    // Patient requests a session with a specific doctor
+    @Transactional
+    public SessionResponse requestSession(SessionRequestRequest request,
+                                          String patientUserId) {
+        String uniquePart = UUID.randomUUID()
+                .toString().replace("-", "").substring(0, 12);
+        String roomName = jitsiRoomPrefix + uniquePart;
+        String roomUrl  = jitsiBaseUrl.stripTrailing().replaceAll("/+$", "") + "/" + roomName;
+
+        Session session = new Session();
+        session.setSessionId(UUID.randomUUID().toString());
+        session.setPatientId(Integer.valueOf(patientUserId));
+        session.setDoctorId(request.getDoctorId());
+        session.setRoomName(roomName);
+        session.setRoomUrl(roomUrl);
+        session.setScheduledAt(request.getPreferredAt());
+        session.setRequestReason(request.getReason());
+        session.setStatus(SessionStatus.PENDING_APPROVAL);
+
+        Session saved = sessionRepository.save(session);
+        log.info("Patient {} requested session {} with doctor {}",
+                patientUserId, saved.getSessionId(), request.getDoctorId());
+        return mapToResponse(saved);
+    }
+
+    // Doctor accepts a pending session request → moves to SCHEDULED
+    @Transactional
+    public SessionResponse acceptSession(String sessionId, String doctorUserId) {
+        Session session = sessionRepository.findBySessionId(sessionId)
+                .orElseThrow(() -> new SessionNotFoundException(
+                        "Session not found: " + sessionId));
+
+        if (session.getStatus() != SessionStatus.PENDING_APPROVAL) {
+            throw new IllegalStateException(
+                    "Only pending sessions can be accepted");
+        }
+
+        if (!session.getDoctorId().toString().equals(doctorUserId)) {
+            throw new IllegalStateException(
+                    "Only the assigned doctor can accept this session");
+        }
+
+        session.setStatus(SessionStatus.SCHEDULED);
+        Session saved = sessionRepository.save(session);
+        log.info("Doctor {} accepted session {}", doctorUserId, sessionId);
+        return mapToResponse(saved);
+    }
+
+    // Doctor rejects a pending session request → moves to CANCELLED
+    @Transactional
+    public SessionResponse rejectSession(String sessionId, String doctorUserId) {
+        Session session = sessionRepository.findBySessionId(sessionId)
+                .orElseThrow(() -> new SessionNotFoundException(
+                        "Session not found: " + sessionId));
+
+        if (session.getStatus() != SessionStatus.PENDING_APPROVAL) {
+            throw new IllegalStateException(
+                    "Only pending sessions can be rejected");
+        }
+
+        if (!session.getDoctorId().toString().equals(doctorUserId)) {
+            throw new IllegalStateException(
+                    "Only the assigned doctor can reject this session");
+        }
+
+        session.setStatus(SessionStatus.CANCELLED);
+        Session saved = sessionRepository.save(session);
+        log.info("Doctor {} rejected session {}", doctorUserId, sessionId);
+        return mapToResponse(saved);
+    }
+
+    // All pending-approval sessions for a specific doctor
+    @Transactional(readOnly = true)
+    public List<SessionResponse> getPendingForDoctor(Integer doctorId) {
+        return sessionRepository.findByDoctorIdAndStatus(doctorId, SessionStatus.PENDING_APPROVAL)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
     // Mark session as ACTIVE when either party joins the room
     @Transactional
     public SessionResponse startSession(String sessionId) {
@@ -121,6 +202,9 @@ public class SessionService {
                 .orElseThrow(() -> new SessionNotFoundException(
                         "Session not found: " + sessionId));
 
+        if (session.getStatus() == SessionStatus.PENDING_APPROVAL) {
+            throw new IllegalStateException("Session has not been accepted by the doctor yet");
+        }
         if (session.getStatus() == SessionStatus.CANCELLED) {
             throw new IllegalStateException("Cannot start a cancelled session");
         }
@@ -176,6 +260,9 @@ public class SessionService {
         if (session.getStatus() == SessionStatus.COMPLETED) {
             throw new IllegalStateException("Cannot cancel a completed session");
         }
+        if (session.getStatus() == SessionStatus.CANCELLED) {
+            throw new IllegalStateException("Session is already cancelled");
+        }
 
         session.setStatus(SessionStatus.CANCELLED);
         return mapToResponse(sessionRepository.save(session));
@@ -226,6 +313,7 @@ public class SessionService {
         res.setEndedAt(session.getEndedAt());
         res.setDurationMinutes(session.getDurationMinutes());
         res.setNotes(session.getNotes());
+        res.setRequestReason(session.getRequestReason());
         res.setCreateDate(session.getCreateDate());
         res.setModifiedDate(session.getModifiedDate());
         return res;

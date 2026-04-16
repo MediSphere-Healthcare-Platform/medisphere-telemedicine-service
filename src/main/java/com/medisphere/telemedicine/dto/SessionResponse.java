@@ -19,6 +19,7 @@ public class SessionResponse {
     private LocalDateTime endedAt;
     private Integer durationMinutes;
     private String notes;
+    private String requestReason;
     private LocalDateTime createDate;
     private LocalDateTime modifiedDate;
     private String jitsiToken;
