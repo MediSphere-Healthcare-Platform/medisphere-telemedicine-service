@@ -59,7 +59,7 @@ public class SessionService {
         String uniquePart = UUID.randomUUID()
                 .toString().replace("-", "").substring(0, 12);
         String roomName = jitsiRoomPrefix + uniquePart;
-        String roomUrl  = jitsiBaseUrl + "/" + roomName;
+        String roomUrl  = jitsiBaseUrl.stripTrailing().replaceAll("/+$", "") + "/" + roomName;
 
         Session session = new Session();
         session.setSessionId(UUID.randomUUID().toString());
