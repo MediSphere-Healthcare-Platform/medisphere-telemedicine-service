@@ -8,9 +8,8 @@ import java.time.LocalDateTime;
 public class SessionResponse {
 
     private String sessionId;
-    private Integer appointmentId;
-    private Integer patientId;
-    private Integer doctorId;
+    private String patientId;
+    private String doctorId;
     private String roomName;
     private String roomUrl;
     private SessionStatus status;
@@ -19,6 +18,7 @@ public class SessionResponse {
     private LocalDateTime endedAt;
     private Integer durationMinutes;
     private String notes;
+    private String requestReason;
     private LocalDateTime createDate;
     private LocalDateTime modifiedDate;
 }

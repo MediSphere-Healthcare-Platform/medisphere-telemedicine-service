@@ -26,11 +26,13 @@ public class Prescription {
     @Column(name = "session_id", unique = true, nullable = false, length = 50)
     private String sessionId;
 
-    @Column(name = "patient_id", nullable = false)
-    private Integer patientId;
+    // Patient email from JWT subject (auth service identifier)
+    @Column(name = "patient_id", nullable = false, length = 100)
+    private String patientId;
 
-    @Column(name = "doctor_id", nullable = false)
-    private Integer doctorId;
+    // Doctor email from JWT subject (auth service identifier)
+    @Column(name = "doctor_id", nullable = false, length = 100)
+    private String doctorId;
 
     @Column(name = "diagnosis", columnDefinition = "text")
     private String diagnosis;

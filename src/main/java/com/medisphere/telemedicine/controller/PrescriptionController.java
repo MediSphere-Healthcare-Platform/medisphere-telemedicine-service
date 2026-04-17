@@ -2,6 +2,7 @@ package com.medisphere.telemedicine.controller;
 
 import com.medisphere.telemedicine.dto.PrescriptionRequest;
 import com.medisphere.telemedicine.dto.PrescriptionResponse;
+import com.medisphere.telemedicine.dto.PrescriptionUpdateRequest;
 import com.medisphere.telemedicine.service.PrescriptionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -57,7 +58,7 @@ public class PrescriptionController {
     @GetMapping("/patient/{patientId}")
     @PreAuthorize("hasAnyRole('PATIENT', 'ADMIN')")
     public ResponseEntity<List<PrescriptionResponse>> getByPatient(
-            @PathVariable Integer patientId) {
+            @PathVariable String patientId) {
         return ResponseEntity.ok(prescriptionService.getByPatient(patientId));
     }
 
@@ -65,7 +66,36 @@ public class PrescriptionController {
     @GetMapping("/doctor/{doctorId}")
     @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
     public ResponseEntity<List<PrescriptionResponse>> getByDoctor(
-            @PathVariable Integer doctorId) {
+            @PathVariable String doctorId) {
         return ResponseEntity.ok(prescriptionService.getByDoctor(doctorId));
+    }
+
+    // PUT /api/prescriptions/{prescriptionId}
+    // Doctor updates diagnosis, medications, or instructions
+    @PutMapping("/{prescriptionId}")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<PrescriptionResponse> updatePrescription(
+            @PathVariable String prescriptionId,
+            @Valid @RequestBody PrescriptionUpdateRequest request) {
+
+        String callerUserId = SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal().toString();
+
+        return ResponseEntity.ok(
+                prescriptionService.updatePrescription(prescriptionId, request, callerUserId));
+    }
+
+    // DELETE /api/prescriptions/{prescriptionId}
+    // Doctor or admin removes a prescription
+    @DeleteMapping("/{prescriptionId}")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+    public ResponseEntity<Void> deletePrescription(
+            @PathVariable String prescriptionId) {
+
+        String callerUserId = SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal().toString();
+
+        prescriptionService.deletePrescription(prescriptionId, callerUserId);
+        return ResponseEntity.noContent().build();
     }
 }

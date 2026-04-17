@@ -9,8 +9,8 @@ public class PrescriptionResponse {
 
     private String prescriptionId;
     private String sessionId;
-    private Integer patientId;
-    private Integer doctorId;
+    private String patientId;
+    private String doctorId;
     private String diagnosis;
     private List<MedicationItem> medications;
     private String instructions;
