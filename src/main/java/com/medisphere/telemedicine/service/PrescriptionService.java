@@ -30,13 +30,19 @@ public class PrescriptionService {
     private final PrescriptionRepository prescriptionRepository;
     private final SessionRepository sessionRepository;
     private final ObjectMapper objectMapper;
+    private final DoctorServiceClient doctorServiceClient;
+    private final PatientClient patientClient;
 
     public PrescriptionService(PrescriptionRepository prescriptionRepository,
                                SessionRepository sessionRepository,
-                               ObjectMapper objectMapper) {
+                               ObjectMapper objectMapper,
+                               DoctorServiceClient doctorServiceClient,
+                               PatientClient patientClient) {
         this.prescriptionRepository = prescriptionRepository;
         this.sessionRepository      = sessionRepository;
         this.objectMapper           = objectMapper;
+        this.doctorServiceClient    = doctorServiceClient;
+        this.patientClient          = patientClient;
     }
 
     // Doctor issues a prescription after a completed session
@@ -52,11 +58,23 @@ public class PrescriptionService {
                     "Prescriptions can only be issued for completed sessions");
         }
 
+        // Validate the patient still exists in patient service
+        if (!patientClient.patientExists(session.getPatientId())) {
+            throw new IllegalArgumentException(
+                    "Patient not found in patient service: " + session.getPatientId());
+        }
+
+        // Validate the doctor still exists in doctor service
+        if (!doctorServiceClient.doctorExists(session.getDoctorId())) {
+            throw new IllegalArgumentException(
+                    "Doctor not found in doctor service: " + session.getDoctorId());
+        }
+
         // Role-based access (@PreAuthorize) already restricts this endpoint to DOCTOR.
         // We log a warning if the caller isn't the session's doctor (possible in
         // multi-service setups where JWT sub and DB doctor ID may differ) but we
         // do not block issuance — the audit trail is preserved via doctorId on the record.
-        if (!session.getDoctorId().toString().equals(callerUserId)) {
+        if (!session.getDoctorId().equals(callerUserId)) {
             log.warn("Prescription issued by doctor {} for session owned by doctor {} — IDs differ (check JWT sub vs DB ID alignment)",
                     callerUserId, session.getDoctorId());
         }
@@ -91,7 +109,7 @@ public class PrescriptionService {
                 .orElseThrow(() -> new PrescriptionNotFoundException(
                         "Prescription not found: " + prescriptionId));
 
-        if (!prescription.getDoctorId().toString().equals(callerUserId)) {
+        if (!prescription.getDoctorId().equals(callerUserId)) {
             log.warn("Update attempted by doctor {} on prescription owned by doctor {}",
                     callerUserId, prescription.getDoctorId());
         }
@@ -133,7 +151,7 @@ public class PrescriptionService {
     }
 
     @Transactional(readOnly = true)
-    public List<PrescriptionResponse> getByPatient(Integer patientId) {
+    public List<PrescriptionResponse> getByPatient(String patientId) {
         return prescriptionRepository.findByPatientId(patientId)
                 .stream()
                 .map(this::mapToResponse)
@@ -141,7 +159,7 @@ public class PrescriptionService {
     }
 
     @Transactional(readOnly = true)
-    public List<PrescriptionResponse> getByDoctor(Integer doctorId) {
+    public List<PrescriptionResponse> getByDoctor(String doctorId) {
         return prescriptionRepository.findByDoctorId(doctorId)
                 .stream()
                 .map(this::mapToResponse)

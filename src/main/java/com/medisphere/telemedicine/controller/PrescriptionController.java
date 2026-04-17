@@ -58,7 +58,7 @@ public class PrescriptionController {
     @GetMapping("/patient/{patientId}")
     @PreAuthorize("hasAnyRole('PATIENT', 'ADMIN')")
     public ResponseEntity<List<PrescriptionResponse>> getByPatient(
-            @PathVariable Integer patientId) {
+            @PathVariable String patientId) {
         return ResponseEntity.ok(prescriptionService.getByPatient(patientId));
     }
 
@@ -66,7 +66,7 @@ public class PrescriptionController {
     @GetMapping("/doctor/{doctorId}")
     @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
     public ResponseEntity<List<PrescriptionResponse>> getByDoctor(
-            @PathVariable Integer doctorId) {
+            @PathVariable String doctorId) {
         return ResponseEntity.ok(prescriptionService.getByDoctor(doctorId));
     }
 

@@ -12,13 +12,11 @@ public interface SessionRepository extends JpaRepository<Session, Integer> {
 
     Optional<Session> findBySessionId(String sessionId);
 
-    Optional<Session> findByAppointmentId(Integer appointmentId);
+    List<Session> findByPatientId(String patientId);
 
-    List<Session> findByPatientId(Integer patientId);
+    List<Session> findByDoctorId(String doctorId);
 
-    List<Session> findByDoctorId(Integer doctorId);
+    List<Session> findByPatientIdAndStatus(String patientId, SessionStatus status);
 
-    List<Session> findByPatientIdAndStatus(Integer patientId, SessionStatus status);
-
-    List<Session> findByDoctorIdAndStatus(Integer doctorId, SessionStatus status);
+    List<Session> findByDoctorIdAndStatus(String doctorId, SessionStatus status);
 }

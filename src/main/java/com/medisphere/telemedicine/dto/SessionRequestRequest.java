@@ -7,8 +7,11 @@ import java.time.LocalDateTime;
 @Data
 public class SessionRequestRequest {
 
+    @NotNull(message = "Patient ID is required")
+    private String patientId;
+
     @NotNull(message = "Doctor ID is required")
-    private Integer doctorId;
+    private String doctorId;
 
     @NotNull(message = "Preferred date & time is required")
     private LocalDateTime preferredAt;
