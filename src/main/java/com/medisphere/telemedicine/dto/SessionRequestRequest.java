@@ -5,7 +5,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-public class SessionCreateRequest {
+public class SessionRequestRequest {
 
     @NotNull(message = "Patient ID is required")
     private String patientId;
@@ -13,8 +13,11 @@ public class SessionCreateRequest {
     @NotNull(message = "Doctor ID is required")
     private String doctorId;
 
-    @NotNull(message = "Scheduled time is required")
-    private LocalDateTime scheduledAt;
+    @NotNull(message = "Preferred date & time is required")
+    private LocalDateTime preferredAt;
+
+    // Optional — patient's reason for requesting the session
+    private String reason;
 
     private String patientName;
     private String doctorName;

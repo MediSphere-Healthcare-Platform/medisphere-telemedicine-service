@@ -2,10 +2,10 @@ package com.medisphere.telemedicine.util;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import java.nio.charset.StandardCharsets;
 import java.security.Key;
 
 @Component
@@ -15,12 +15,16 @@ public class JwtUtil {
     private String jwtSecret;
 
     public Claims extractAllClaims(String token) {
-        Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
         return Jwts.parserBuilder()
-                .setSigningKey(key)
+                .setSigningKey(getSignKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
+    }
+
+    private Key getSignKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String extractUserId(String token) {
