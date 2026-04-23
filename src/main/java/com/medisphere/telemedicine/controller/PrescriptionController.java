@@ -4,7 +4,9 @@ import com.medisphere.telemedicine.dto.PrescriptionRequest;
 import com.medisphere.telemedicine.dto.PrescriptionResponse;
 import com.medisphere.telemedicine.dto.PrescriptionUpdateRequest;
 import com.medisphere.telemedicine.service.PrescriptionService;
+import com.medisphere.telemedicine.util.JwtUtil;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,9 +17,11 @@ import java.util.List;
 public class PrescriptionController {
 
     private final PrescriptionService prescriptionService;
+    private final JwtUtil jwtUtil;
 
-    public PrescriptionController(PrescriptionService prescriptionService) {
+    public PrescriptionController(PrescriptionService prescriptionService, JwtUtil jwtUtil) {
         this.prescriptionService = prescriptionService;
+        this.jwtUtil = jwtUtil;
     }
 
     // POST /api/prescriptions
@@ -25,7 +29,12 @@ public class PrescriptionController {
     @PostMapping
     public ResponseEntity<PrescriptionResponse> createPrescription(
             @Valid @RequestBody PrescriptionRequest request,
-            @RequestParam String doctorUserId) {
+            @RequestParam(required = false) String doctorUserId,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader) {
+
+        if (doctorUserId == null) {
+            doctorUserId = jwtUtil.extractUserId(authHeader);
+        }
 
         PrescriptionResponse response =
                 prescriptionService.createPrescription(request, doctorUserId);
@@ -67,7 +76,12 @@ public class PrescriptionController {
     public ResponseEntity<PrescriptionResponse> updatePrescription(
             @PathVariable String prescriptionId,
             @Valid @RequestBody PrescriptionUpdateRequest request,
-            @RequestParam String doctorUserId) {
+            @RequestParam(required = false) String doctorUserId,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader) {
+
+        if (doctorUserId == null) {
+            doctorUserId = jwtUtil.extractUserId(authHeader);
+        }
 
         return ResponseEntity.ok(
                 prescriptionService.updatePrescription(prescriptionId, request, doctorUserId));
@@ -78,7 +92,12 @@ public class PrescriptionController {
     @DeleteMapping("/{prescriptionId}")
     public ResponseEntity<Void> deletePrescription(
             @PathVariable String prescriptionId,
-            @RequestParam String doctorUserId) {
+            @RequestParam(required = false) String doctorUserId,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader) {
+
+        if (doctorUserId == null) {
+            doctorUserId = jwtUtil.extractUserId(authHeader);
+        }
 
         prescriptionService.deletePrescription(prescriptionId, doctorUserId);
         return ResponseEntity.noContent().build();

@@ -5,7 +5,9 @@ import com.medisphere.telemedicine.dto.SessionCreateRequest;
 import com.medisphere.telemedicine.dto.SessionRequestRequest;
 import com.medisphere.telemedicine.dto.SessionResponse;
 import com.medisphere.telemedicine.service.SessionService;
+import com.medisphere.telemedicine.util.JwtUtil;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,9 +18,11 @@ import java.util.List;
 public class SessionController {
 
     private final SessionService sessionService;
+    private final JwtUtil jwtUtil;
 
-    public SessionController(SessionService sessionService) {
+    public SessionController(SessionService sessionService, JwtUtil jwtUtil) {
         this.sessionService = sessionService;
+        this.jwtUtil = jwtUtil;
     }
 
     // POST /api/sessions
@@ -34,8 +38,16 @@ public class SessionController {
     @GetMapping("/{sessionId}")
     public ResponseEntity<SessionResponse> getSession(
             @PathVariable String sessionId,
-            @RequestParam String userId,
-            @RequestParam String role) {
+            @RequestParam(required = false) String userId,
+            @RequestParam(required = false) String role,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader) {
+
+        if (userId == null) {
+            userId = jwtUtil.extractUserId(authHeader);
+        }
+        if (role == null) {
+            role = jwtUtil.extractRole(authHeader);
+        }
 
         return ResponseEntity.ok(
                 sessionService.getSession(sessionId, userId, role));
@@ -85,7 +97,12 @@ public class SessionController {
     @PostMapping("/request")
     public ResponseEntity<SessionResponse> requestSession(
             @Valid @RequestBody SessionRequestRequest request,
-            @RequestParam String patientUserId) {
+            @RequestParam(required = false) String patientUserId,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader) {
+
+        if (patientUserId == null) {
+            patientUserId = jwtUtil.extractUserId(authHeader);
+        }
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(sessionService.requestSession(request, patientUserId));
@@ -96,7 +113,12 @@ public class SessionController {
     @PutMapping("/{sessionId}/accept")
     public ResponseEntity<SessionResponse> acceptSession(
             @PathVariable String sessionId,
-            @RequestParam String doctorUserId) {
+            @RequestParam(required = false) String doctorUserId,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader) {
+
+        if (doctorUserId == null) {
+            doctorUserId = jwtUtil.extractUserId(authHeader);
+        }
 
         return ResponseEntity.ok(sessionService.acceptSession(sessionId, doctorUserId));
     }
@@ -106,7 +128,12 @@ public class SessionController {
     @PutMapping("/{sessionId}/reject")
     public ResponseEntity<SessionResponse> rejectSession(
             @PathVariable String sessionId,
-            @RequestParam String doctorUserId) {
+            @RequestParam(required = false) String doctorUserId,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader) {
+
+        if (doctorUserId == null) {
+            doctorUserId = jwtUtil.extractUserId(authHeader);
+        }
 
         return ResponseEntity.ok(sessionService.rejectSession(sessionId, doctorUserId));
     }
