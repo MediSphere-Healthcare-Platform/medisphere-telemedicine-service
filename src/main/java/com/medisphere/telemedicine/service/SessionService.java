@@ -1,5 +1,7 @@
 package com.medisphere.telemedicine.service;
 
+import com.medisphere.telemedicine.client.MedisphereDoctorClient;
+import com.medisphere.telemedicine.client.MedispherePatientClient;
 import com.medisphere.telemedicine.domain.SessionStatus;
 import com.medisphere.telemedicine.dto.EndSessionRequest;
 import com.medisphere.telemedicine.dto.SessionCreateRequest;
@@ -11,6 +13,7 @@ import com.medisphere.telemedicine.repository.SessionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
@@ -28,8 +31,8 @@ public class SessionService {
     private final SessionRepository sessionRepository;
     private final NotificationClient notificationClient;
     private final JitsiTokenService jitsiTokenService;
-    private final DoctorServiceClient doctorServiceClient;
-    private final PatientClient patientClient;
+    private final MedisphereDoctorClient doctorClient;
+    private final MedispherePatientClient patientClient;
 
     @Value("${jitsi.base-url}")
     private String jitsiBaseUrl;
@@ -40,13 +43,13 @@ public class SessionService {
     public SessionService(SessionRepository sessionRepository,
                           NotificationClient notificationClient,
                           JitsiTokenService jitsiTokenService,
-                          DoctorServiceClient doctorServiceClient,
-                          PatientClient patientClient) {
-        this.sessionRepository   = sessionRepository;
-        this.notificationClient  = notificationClient;
-        this.jitsiTokenService   = jitsiTokenService;
-        this.doctorServiceClient = doctorServiceClient;
-        this.patientClient       = patientClient;
+                          MedisphereDoctorClient doctorClient,
+                          MedispherePatientClient patientClient) {
+        this.sessionRepository  = sessionRepository;
+        this.notificationClient = notificationClient;
+        this.jitsiTokenService  = jitsiTokenService;
+        this.doctorClient       = doctorClient;
+        this.patientClient      = patientClient;
     }
 
     // Role-aware — generates correct jitsiToken for caller
@@ -79,14 +82,30 @@ public class SessionService {
     @Transactional
     public SessionResponse createSessionByDoctor(SessionCreateRequest request) {
 
-        if (!patientClient.patientExists(request.getPatientId())) {
-            throw new IllegalArgumentException(
-                    "Patient not found in patient service: " + request.getPatientId());
+        // Validate patient exists via Feign
+        try {
+            ResponseEntity<?> patientResp = patientClient.getPatientById(request.getPatientId());
+            if (patientResp == null || patientResp.getBody() == null) {
+                throw new IllegalArgumentException(
+                        "Patient not found in patient service: " + request.getPatientId());
+            }
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Could not verify patient {} — proceeding: {}", request.getPatientId(), e.getMessage());
         }
 
-        if (!doctorServiceClient.doctorExists(request.getDoctorId())) {
-            throw new IllegalArgumentException(
-                    "Doctor not found in doctor service: " + request.getDoctorId());
+        // Validate doctor exists via Feign
+        try {
+            ResponseEntity<?> doctorResp = doctorClient.getDoctorById(request.getDoctorId());
+            if (doctorResp == null || doctorResp.getBody() == null) {
+                throw new IllegalArgumentException(
+                        "Doctor not found in doctor service: " + request.getDoctorId());
+            }
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Could not verify doctor {} — proceeding: {}", request.getDoctorId(), e.getMessage());
         }
 
         String uniquePart = UUID.randomUUID()
@@ -113,16 +132,30 @@ public class SessionService {
     @Transactional
     public SessionResponse requestSession(SessionRequestRequest request,
                                           String patientUserId) {
-        // Validate patient exists in patient service
-        if (!patientClient.patientExists(request.getPatientId())) {
-            throw new IllegalArgumentException(
-                    "Patient not found in patient service: " + request.getPatientId());
+        // Validate patient exists via Feign
+        try {
+            ResponseEntity<?> patientResp = patientClient.getPatientById(request.getPatientId());
+            if (patientResp == null || patientResp.getBody() == null) {
+                throw new IllegalArgumentException(
+                        "Patient not found in patient service: " + request.getPatientId());
+            }
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Could not verify patient {} — proceeding: {}", request.getPatientId(), e.getMessage());
         }
 
-        // Validate doctor exists in doctor service
-        if (!doctorServiceClient.doctorExists(request.getDoctorId())) {
-            throw new IllegalArgumentException(
-                    "Doctor not found in doctor service: " + request.getDoctorId());
+        // Validate doctor exists via Feign
+        try {
+            ResponseEntity<?> doctorResp = doctorClient.getDoctorById(request.getDoctorId());
+            if (doctorResp == null || doctorResp.getBody() == null) {
+                throw new IllegalArgumentException(
+                        "Doctor not found in doctor service: " + request.getDoctorId());
+            }
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Could not verify doctor {} — proceeding: {}", request.getDoctorId(), e.getMessage());
         }
 
         String uniquePart = UUID.randomUUID()
@@ -288,9 +321,10 @@ public class SessionService {
         SessionResponse res = buildBaseResponse(session);
 
         boolean isModerator = "DOCTOR".equals(role);
-        String userName = isModerator
-                ? "Dr. " + userId
-                : "Patient " + userId;
+        String userName = isModerator ? res.getDoctorName() : res.getPatientName();
+        if (userName == null || userName.isEmpty()) {
+            userName = isModerator ? "Dr. " + userId : "Patient " + userId;
+        }
 
         res.setJitsiToken(jitsiTokenService.generateToken(
                 session.getRoomName(),
@@ -325,6 +359,31 @@ public class SessionService {
         res.setRequestReason(session.getRequestReason());
         res.setCreateDate(session.getCreateDate());
         res.setModifiedDate(session.getModifiedDate());
+
+        // Fetch Patient Name
+        try {
+            ResponseEntity<com.medisphere.telemedicine.client.response.PatientByIdClientResponse> patientResp = 
+                patientClient.getPatientById(session.getPatientId());
+            if (patientResp != null && patientResp.getBody() != null && patientResp.getBody().getData() != null) {
+                var data = patientResp.getBody().getData();
+                res.setPatientName(data.getFirstName() + " " + data.getLastName());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to fetch patient name for {}: {}", session.getPatientId(), e.getMessage());
+        }
+
+        // Fetch Doctor Name
+        try {
+            ResponseEntity<com.medisphere.telemedicine.client.response.DoctorByIdClientResponse> doctorResp = 
+                doctorClient.getDoctorById(session.getDoctorId());
+            if (doctorResp != null && doctorResp.getBody() != null && doctorResp.getBody().getData() != null) {
+                var data = doctorResp.getBody().getData();
+                res.setDoctorName(data.getFirstName() + " " + data.getLastName());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to fetch doctor name for {}: {}", session.getDoctorId(), e.getMessage());
+        }
+
         return res;
     }
 }

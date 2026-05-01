@@ -22,4 +22,6 @@ public class SessionResponse {
     private LocalDateTime createDate;
     private LocalDateTime modifiedDate;
     private String jitsiToken;
+    private String patientName;
+    private String doctorName;
 }

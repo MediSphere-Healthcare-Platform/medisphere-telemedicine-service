@@ -1,6 +1,8 @@
 package com.medisphere.telemedicine.controller;
 
-import com.medisphere.telemedicine.service.DoctorServiceClient;
+import com.medisphere.telemedicine.client.MedisphereDoctorClient;
+import com.medisphere.telemedicine.client.MedisphereDoctorClient;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -8,9 +10,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/doctors")
 public class DoctorController {
 
-    private final DoctorServiceClient doctorServiceClient;
+    private final MedisphereDoctorClient doctorServiceClient;
 
-    public DoctorController(DoctorServiceClient doctorServiceClient) {
+    public DoctorController(MedisphereDoctorClient doctorServiceClient) {
         this.doctorServiceClient = doctorServiceClient;
     }
 
