@@ -1,8 +1,6 @@
 package com.medisphere.telemedicine.controller;
 
 import com.medisphere.telemedicine.client.MedisphereDoctorClient;
-import com.medisphere.telemedicine.client.MedisphereDoctorClient;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

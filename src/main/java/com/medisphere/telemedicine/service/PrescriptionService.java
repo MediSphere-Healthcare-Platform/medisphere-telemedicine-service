@@ -2,6 +2,8 @@ package com.medisphere.telemedicine.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.medisphere.telemedicine.client.MedisphereDoctorClient;
+import com.medisphere.telemedicine.client.MedispherePatientClient;
 import com.medisphere.telemedicine.domain.SessionStatus;
 import com.medisphere.telemedicine.dto.MedicationItem;
 import com.medisphere.telemedicine.dto.PrescriptionRequest;
@@ -15,6 +17,7 @@ import com.medisphere.telemedicine.repository.PrescriptionRepository;
 import com.medisphere.telemedicine.repository.SessionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Collections;
@@ -30,18 +33,18 @@ public class PrescriptionService {
     private final PrescriptionRepository prescriptionRepository;
     private final SessionRepository sessionRepository;
     private final ObjectMapper objectMapper;
-    private final DoctorServiceClient doctorServiceClient;
-    private final PatientClient patientClient;
+    private final MedisphereDoctorClient doctorClient;
+    private final MedispherePatientClient patientClient;
 
     public PrescriptionService(PrescriptionRepository prescriptionRepository,
                                SessionRepository sessionRepository,
                                ObjectMapper objectMapper,
-                               DoctorServiceClient doctorServiceClient,
-                               PatientClient patientClient) {
+                               MedisphereDoctorClient doctorClient,
+                               MedispherePatientClient patientClient) {
         this.prescriptionRepository = prescriptionRepository;
         this.sessionRepository      = sessionRepository;
         this.objectMapper           = objectMapper;
-        this.doctorServiceClient    = doctorServiceClient;
+        this.doctorClient           = doctorClient;
         this.patientClient          = patientClient;
     }
 
@@ -59,15 +62,29 @@ public class PrescriptionService {
         }
 
         // Validate the patient still exists in patient service
-        if (!patientClient.patientExists(session.getPatientId())) {
-            throw new IllegalArgumentException(
-                    "Patient not found in patient service: " + session.getPatientId());
+        try {
+            ResponseEntity<?> patientResp = patientClient.getPatientById(session.getPatientId());
+            if (patientResp == null || patientResp.getBody() == null) {
+                throw new IllegalArgumentException(
+                        "Patient not found in patient service: " + session.getPatientId());
+            }
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Could not verify patient {} — proceeding: {}", session.getPatientId(), e.getMessage());
         }
 
         // Validate the doctor still exists in doctor service
-        if (!doctorServiceClient.doctorExists(session.getDoctorId())) {
-            throw new IllegalArgumentException(
-                    "Doctor not found in doctor service: " + session.getDoctorId());
+        try {
+            ResponseEntity<?> doctorResp = doctorClient.getDoctorById(session.getDoctorId());
+            if (doctorResp == null || doctorResp.getBody() == null) {
+                throw new IllegalArgumentException(
+                        "Doctor not found in doctor service: " + session.getDoctorId());
+            }
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Could not verify doctor {} — proceeding: {}", session.getDoctorId(), e.getMessage());
         }
 
         // Role-based access (@PreAuthorize) already restricts this endpoint to DOCTOR.

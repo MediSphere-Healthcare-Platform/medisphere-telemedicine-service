@@ -11,4 +11,7 @@ public interface MedisphereDoctorClient {
 
     @GetMapping("/doctor/api/v1/getDoctorById/{id}")
     ResponseEntity<DoctorByIdClientResponse> getDoctorById(@PathVariable("id") String id);
+
+    @GetMapping("/doctor/api/v1//getAllDoctors")
+    ResponseEntity<DoctorByIdClientResponse> getAllDoctors();
 }
